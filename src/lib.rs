@@ -8,9 +8,10 @@ pub mod jupiter_override {
     use anchor_lang::prelude::*;
     use anchor_lang::Discriminator;
     use anchor_lang::{AnchorSerialize, InstructionData};
-    use std::io::Write;
+    use std::io;
+    use std::io::{ErrorKind, Write};
 
-    #[derive(AnchorSerialize)]
+    #[derive(AnchorSerialize, AnchorDeserialize)]
     pub enum Swap {
         Saber,
         SaberAddDecimalsDeposit,
@@ -93,7 +94,18 @@ pub mod jupiter_override {
         }
     }
 
-    #[derive(AnchorSerialize)]
+    impl AnchorDeserialize for SwapLeg {
+        fn deserialize(buf: &mut &[u8]) -> std::io::Result<Self> {
+            match buf[0] {
+                0u8 => Ok(SwapLeg::Chain { swap_legs: AnchorDeserialize::deserialize(buf)? }),
+                1u8 => Ok(SwapLeg::Split { split_legs: AnchorDeserialize::deserialize(buf)? }),
+                2u8 => Ok(SwapLeg::Swap { swap: AnchorDeserialize::deserialize(buf)? }),
+                _ => Err(io::Error::new(ErrorKind::NotFound, "No recognized swap leg")),
+            }
+        }
+    }
+
+    #[derive(AnchorSerialize, AnchorDeserialize)]
     pub struct Route {
         pub swap_leg: SwapLeg,
         pub in_amount: u64,
