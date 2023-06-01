@@ -11,7 +11,7 @@ pub mod jupiter_override {
     use std::io;
     use std::io::{ErrorKind, Write};
 
-    #[derive(AnchorSerialize, AnchorDeserialize)]
+    #[derive(AnchorSerialize, AnchorDeserialize, Debug)]
     pub enum Swap {
         Saber,
         SaberAddDecimalsDeposit,
@@ -68,6 +68,7 @@ pub mod jupiter_override {
         },
     }
 
+    #[derive(Debug)]
     pub enum SwapLeg {
         Chain { swap_legs: Vec<SwapLeg> },
         Split { split_legs: Vec<SplitLeg> },
@@ -97,15 +98,24 @@ pub mod jupiter_override {
     impl AnchorDeserialize for SwapLeg {
         fn deserialize(buf: &mut &[u8]) -> std::io::Result<Self> {
             match buf[0] {
-                0u8 => Ok(SwapLeg::Chain { swap_legs: AnchorDeserialize::deserialize(buf)? }),
-                1u8 => Ok(SwapLeg::Split { split_legs: AnchorDeserialize::deserialize(buf)? }),
-                2u8 => Ok(SwapLeg::Swap { swap: AnchorDeserialize::deserialize(buf)? }),
-                _ => Err(io::Error::new(ErrorKind::NotFound, "No recognized swap leg")),
+                0u8 => Ok(SwapLeg::Chain {
+                    swap_legs: AnchorDeserialize::deserialize(&mut buf.split_at(1).1)?,
+                }),
+                1u8 => Ok(SwapLeg::Split {
+                    split_legs: AnchorDeserialize::deserialize(&mut buf.split_at(1).1)?,
+                }),
+                2u8 => Ok(SwapLeg::Swap {
+                    swap: AnchorDeserialize::deserialize(&mut buf.split_at(1).1)?,
+                }),
+                _ => Err(io::Error::new(
+                    ErrorKind::NotFound,
+                    "No recognized swap leg",
+                )),
             }
         }
     }
 
-    #[derive(AnchorSerialize, AnchorDeserialize)]
+    #[derive(AnchorSerialize, AnchorDeserialize, Debug)]
     pub struct Route {
         pub swap_leg: SwapLeg,
         pub in_amount: u64,
@@ -119,4 +129,45 @@ pub mod jupiter_override {
     }
 
     impl InstructionData for Route {}
+
+    #[derive(AnchorSerialize, AnchorDeserialize, Debug, PartialEq)]
+    pub struct RouteMeta {
+        pub in_amount: u64,
+        pub quoted_out_amount: u64,
+        pub slippage_bps: u16,
+        pub platform_fee_bps: u8,
+    }
+
+    impl RouteMeta {
+        pub const SIZE: usize = 19;
+    }
+}
+
+#[cfg(test)]
+mod serialization_tests {
+    use crate::jupiter_override::RouteMeta;
+    use crate::jupiter_override::{Route, SwapLeg};
+    use anchor_lang::AnchorDeserialize;
+    use std::os::raw;
+
+    #[test]
+    fn deserialize_test() {
+        let raw_ix = vec![
+            229, 23, 203, 151, 122, 227, 173, 42, 0, 1, 0, 0, 0, 1, 2, 0, 0, 0, 60, 2, 17, 1, 40,
+            2, 11, 236, 213, 212, 1, 0, 0, 0, 0, 146, 177, 9, 0, 0, 0, 0, 0, 5, 0, 0,
+        ];
+
+        let meta = RouteMeta::deserialize(&mut raw_ix.split_at(raw_ix.len() - RouteMeta::SIZE).1)
+            .expect("Failed to parse meta");
+
+        assert_eq!(
+            meta,
+            RouteMeta {
+                in_amount: 30725612,
+                quoted_out_amount: 635282,
+                slippage_bps: 5,
+                platform_fee_bps: 0,
+            }
+        );
+    }
 }
