@@ -96,16 +96,16 @@ pub mod jupiter_override {
     }
 
     impl AnchorDeserialize for SwapLeg {
-        fn deserialize(buf: &mut &[u8]) -> std::io::Result<Self> {
-            match buf[0] {
+        fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
+            match u8::deserialize_reader(reader)? {
                 0u8 => Ok(SwapLeg::Chain {
-                    swap_legs: AnchorDeserialize::deserialize(&mut buf.split_at(1).1)?,
+                    swap_legs: AnchorDeserialize::deserialize_reader(reader)?,
                 }),
                 1u8 => Ok(SwapLeg::Split {
-                    split_legs: AnchorDeserialize::deserialize(&mut buf.split_at(1).1)?,
+                    split_legs: AnchorDeserialize::deserialize_reader(reader)?,
                 }),
                 2u8 => Ok(SwapLeg::Swap {
-                    swap: AnchorDeserialize::deserialize(&mut buf.split_at(1).1)?,
+                    swap: AnchorDeserialize::deserialize_reader(reader)?,
                 }),
                 _ => Err(io::Error::new(
                     ErrorKind::NotFound,
@@ -146,9 +146,7 @@ pub mod jupiter_override {
 #[cfg(test)]
 mod serialization_tests {
     use crate::jupiter_override::RouteMeta;
-    use crate::jupiter_override::{Route, SwapLeg};
     use anchor_lang::AnchorDeserialize;
-    use std::os::raw;
 
     #[test]
     fn deserialize_test() {

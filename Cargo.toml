@@ -1,6 +1,6 @@
 [package]
 name = "jupiter-cpi"
-version = "4.0.4"
+version = "4.0.5"
 edition = "2021"
 description = "Anchor CPI client for the Jupiter program."
 authors = ["Siong Ong <siong@raccoons.dev>"]
@@ -17,5 +17,5 @@ cpi = ["no-entrypoint"]
 
 [dependencies]
 anchor-gen = "0.3.1"
-anchor-lang = { git = "https://github.com/debridge-finance/anchor.git", branch = "update-solana-version"}
-solana-program = "< 1.15"
+anchor-lang = { git = "https://github.com/debridge-finance/anchor.git", tag = "v0.28.0-dev.debridge.6"}
+solana-program = "1.16.0"
